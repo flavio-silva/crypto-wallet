@@ -1,8 +1,10 @@
+import 'package:crypto_coins/config/app_settings.dart';
 import 'package:crypto_coins/models/coin.dart';
 import 'package:easy_mask/easy_mask.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
 class CoinDetailsPage extends StatefulWidget {
   final Coin coin;
@@ -18,11 +20,10 @@ class CoinDetailsPage extends StatefulWidget {
 
 class _CoinDetailsPageState extends State<CoinDetailsPage> {
   final _form = GlobalKey<FormState>();
-  final _textEditingController = TextEditingController();
   double _cryptoQtde = 0.0;
 
-  NumberFormat currencyFormat =
-      NumberFormat.currency(locale: 'pt_BR', name: 'R\$');
+  late NumberFormat _numberFormat;
+  late NumberFormat _cryptoFormat;
 
   void _purchase() {
     if (_form.currentState!.validate()) {
@@ -44,8 +45,21 @@ class _CoinDetailsPageState extends State<CoinDetailsPage> {
     });
   }
 
+  void _readLocaleSettings() {
+    final settings = context.watch<AppSettings>().settings;
+    _numberFormat = NumberFormat.currency(
+      locale: settings['locale'],
+      name: settings['currencySymbol'],
+    );
+
+    _cryptoFormat = NumberFormat.currency(
+        locale: settings['locale'], decimalDigits: 8, name: '');
+  }
+
   @override
   Widget build(BuildContext context) {
+    _readLocaleSettings();
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.coin.name),
@@ -65,7 +79,7 @@ class _CoinDetailsPageState extends State<CoinDetailsPage> {
                   ),
                   SizedBox(width: 8),
                   Text(
-                    currencyFormat.format(widget.coin.price),
+                    _numberFormat.format(widget.coin.price),
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w600,
@@ -80,7 +94,7 @@ class _CoinDetailsPageState extends State<CoinDetailsPage> {
               padding: const EdgeInsets.only(bottom: 16),
               child: Center(
                 child: Text(
-                  '${_cryptoQtde.toStringAsFixed(8)} ${widget.coin.initials}',
+                  '${_cryptoFormat.format(_cryptoQtde)} ${widget.coin.initials}',
                   style: TextStyle(
                     fontSize: 16,
                     color: Colors.indigo.shade900,
@@ -101,32 +115,34 @@ class _CoinDetailsPageState extends State<CoinDetailsPage> {
                       inputFormatters: [
                         FilteringTextInputFormatter.digitsOnly,
                         TextInputMask(
-                            mask: ' !9+.999,99',
-                            placeholder: '0',
-                            maxPlaceHolders: 3,
-                            reverse: true),
+                          mask:
+                              '9+${_numberFormat.symbols.GROUP_SEP}999${_numberFormat.symbols.DECIMAL_SEP}99',
+                          placeholder: '0',
+                          maxPlaceHolders: 3,
+                          reverse: true,
+                        ),
                       ],
-                      controller: _textEditingController,
                       decoration: InputDecoration(
                         border: OutlineInputBorder(),
                         labelText: 'Valor',
                         prefixIcon: Icon(Icons.monetization_on),
-                        suffixText: 'reais',
+                        suffixText: _numberFormat.currencyName,
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Informe um valor';
                         }
 
-                        if (currencyFormat.parse(value) < 50) {
+                        if (_numberFormat.parse(value) < 50) {
                           return 'Valor mínimo é 50';
                         }
                       },
                       onChanged: (value) {
-                        double newValue = currencyFormat.parse(value) as double;
+                        double newValue = _numberFormat.parse(value) as double;
 
                         _calculateCryptoQtde(newValue);
                       },
+                      // initialValue: ' 0,00',
                     ),
                   ),
                 ],
